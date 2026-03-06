@@ -1,0 +1,47 @@
+#!/bin/bash
+
+
+
+# Path to location limine.conf
+p_file=/boot/limine.conf
+if  [ -z "$1" ] ; then
+echo "no adding new entrance"
+else
+arg=$1
+sed -i "5 i /Arch-$arg" $p_file
+sed -i "6i     protocol: efi_chainload" $p_file
+sed -i "7i     image_path: boot():/EFI/Linux/arch-linux-$arg.efi#" $p_file
+#sed -i "7G"  $p_file
+fi
+
+#Cycle: get name efi image from  limine.conf
+for i in $(awk 'BEGIN{FS="/"}{print $4}' < $p_file | cut -d '#' -f 1)
+do
+# Condition defining the path to efi image.
+    if [ "$i" = systemd-bootx64.efi ]
+    then path=/boot/EFI/systemd/
+    elif [ "$i" = arch-netboot.efi ]
+    then path=/boot/EFI/arch_netboot/
+    else path=/boot/EFI/Linux/
+    fi
+# Compute checksum for efi image and assing value to bk2
+    bk2=$(b2sum  "$path""$i" | cut -d ' ' -f 1)
+# Exchange checksum on new one in limine.conf
+sed -i -e "/.*image_path*/s/$i#.*/$i#$bk2/"  $p_file
+echo $bk2
+done
+
+#bk2=$(b2sum  "$path""$1" | cut -d ' ' -f 1)
+# Copy Limine efi boot image in boot partition
+ 
+cp -v /usr/share/limine/BOOTX64.EFI /boot/EFI/BOOT/Limix64.efi
+#Compute checksum for limine.conf cut off tail (path) and assing checksum to  bk1
+bk1=$(b2sum /boot/limine.conf | cut -d ' ' -f 1)
+echo $bk1
+#Enroll checksum limine.conf to boot image in boot partition with limine enroll.
+ 
+limine enroll-config /boot/EFI/BOOT/Limix64.efi $bk1
+
+# Sign the bootloader in the end
+ 
+sbsign --key /path/to/yours/db.key --cert /path/to/yours/db.crt --output /boot/EFI/BOOT/Limix64.efi /boot/EFI/BOOT/Limix64.efi
