@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+#path to this file /etc/initcpio/post/
+uki="$3"
+[[ -n "$uki" ]] || exit 0
+
+echo "$3"
+echo "$KERNELVERSION"
+echo "$KERNELDESTINATION"
+
+keypairs=(/path/to/your/db.key /path/to/your/db.crt)
+
+for (( i=0; i<${#keypairs[@]}; i+=2 )); do
+    key="${keypairs[$i]}" cert="${keypairs[(( i + 1 ))]}"
+    if ! sbverify --cert "$cert" "$uki" &>/dev/null; then
+        sbsign --key "$key" --cert "$cert" --output "$uki" "$uki"
+    fi
+done
+
+path_f=/path/to your/limine.conf
+
+if  [ $(grep -ic "${uki##*-}" $path_f) -ge 1 ] || [ "${uki##*-}" == "fallback.efi" ] ; then
+echo "no adding new enter"
+else
+
+sed -i "5 i /Arch-${uki##*-}" $path_f
+sed -i "6i     protocol: efi_chainload" $path_f
+sed -i "7i     image_path: boot():/EFI/Linux/arch-linux-${uki##*-}#" $path_f
+#sed -i "7G"  $path_f
+fi
+
+bk2=`b2sum  "$uki"`
+sed -i -e "/.*image_path*/ s/${uki##*/}#.*/${uki##*/}#${bk2% *}/"  $path_f
+
+cp -v /usr/share/limine/BOOTX64.EFI /boot/EFI/BOOT/Limix64.efi
+bk1=$(b2sum /boot/limine.conf | cut -d ' ' -f 1)
+#echo $bk1
+#Enroll checksum limine.conf to boot image in boot partition with limine enroll.
+limine enroll-config /boot/EFI/BOOT/Limix64.efi $bk1
+
+# Sign the bootloader in the end
+sbsign --key "$key" --cert "$cert" --output /boot/EFI/BOOT/Limix64.efi /boot/EFI/BOOT/Limix64.efi
