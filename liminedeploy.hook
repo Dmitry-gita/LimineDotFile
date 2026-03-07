@@ -1,0 +1,11 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = limine              
+
+
+[Action]
+Description = Renew hash Limine after upgrade...place for this file /etc/pacman.d/hooks
+When = PostTransaction
+Exec = /bin/sh -c '/path/to/your/.limineupgrade'
